@@ -39,6 +39,9 @@ COPY --from=builder /root/ws/src /root/ws/src
 COPY web/index.html /usr/share/nginx/html/index.html
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 
+# 复制测试文件 (可选，如果需要在容器内跑测试)
+COPY tests /tests
+
 # 权限设置
 RUN chown -R robotuser:robotuser /root/ws /var/log/nginx /var/lib/nginx /usr/share/nginx/html
 
