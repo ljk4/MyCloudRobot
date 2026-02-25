@@ -56,12 +56,12 @@ COPY tests /tests
 # 权限设置
 RUN chown -R robotuser:robotuser /root/ws /var/log/nginx /var/lib/nginx /usr/share/nginx/html
 
+COPY --chown=robotuser:robotuser docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 USER robotuser
 
 EXPOSE 80 9090
-
-COPY docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 
 # 健康检查：检查 Web 和 Rosbridge 端口
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
