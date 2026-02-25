@@ -1,0 +1,55 @@
+# Stage 1: Builder (编译 ROS 2 包)
+FROM ros:humble AS builder
+
+WORKDIR /root/ws
+COPY ros_ws/src ./src
+
+# 安装依赖并编译
+RUN apt-get update && \
+    rosdep update && \
+    rosdep install --from-paths src --ignore-src -r -y && \
+    . /opt/ros/humble/setup.bash && \
+    colcon build --symlink-install
+
+# Stage 2: Runtime (最小化运行环境)
+FROM ros:humble
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 安装运行时工具: rosbridge, nginx, curl, net-tools (用于测试)
+RUN apt-get update && apt-get install -y \
+    ros-humble-rosbridge-server \
+    ros-humble-tf2-web-republisher \
+    nginx \
+    curl \
+    net-tools \
+    iputils-ping \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# 创建非 root 用户 (安全最佳实践)
+RUN useradd -m -u 1000 robotuser
+
+# 复制构建产物
+COPY --from=builder /root/ws/install /root/ws/install
+COPY --from=builder /root/ws/src /root/ws/src
+
+# 复制 Web 文件
+COPY web/index.html /usr/share/nginx/html/index.html
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+
+# 权限设置
+RUN chown -R robotuser:robotuser /root/ws /var/log/nginx /var/lib/nginx /usr/share/nginx/html
+
+USER robotuser
+
+EXPOSE 80 9090
+
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# 健康检查：检查 Web 和 Rosbridge 端口
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:80 && netstat -tlnp | grep 9090 || exit 1
+
+ENTRYPOINT ["/entrypoint.sh"]

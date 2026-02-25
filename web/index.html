@@ -1,0 +1,5 @@
+// 在 index.html 的 script 标签中
+const ros = new ROSLIB.Ros({
+    // 自动获取当前网页的 host (例如 http://1.2.3.4 -> ws://1.2.3.4:9090)
+    url: 'ws://' + window.location.hostname + ':9090' 
+});
