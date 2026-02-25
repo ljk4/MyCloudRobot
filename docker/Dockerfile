@@ -1,11 +1,12 @@
-# Stage 1: Builder (编译 ROS 2 包)
+# Stage 1: Builder
 FROM ros:humble AS builder
 
 WORKDIR /root/ws
 COPY ros_ws/src ./src
 
-# 安装依赖并编译
+# 🔴 关键修复：在安装 rosdep 之前或之后安装 pip3
 RUN apt-get update && \
+    apt-get install -y python3-pip && \
     rosdep update && \
     rosdep install --from-paths src --ignore-src -r -y && \
     . /opt/ros/humble/setup.bash && \
