@@ -14,7 +14,7 @@ setup(
         ('share/' + package_name + '/launch', glob(os.path.join('launch', '*.launch.py'))),
     ],
     install_requires=['setuptools'],
-    zip_safe=True,
+    zip_safe=False,
     maintainer='ubuntu',
     maintainer_email='ubuntu@todo.todo',
     description='Cloud Robot Monitor',
