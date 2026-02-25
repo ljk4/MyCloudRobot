@@ -1,55 +1,139 @@
+# ==============================================================================
+# 工作流名称：CD - 构建与部署 (Continuous Deployment)
+# 触发条件：当代码推送到 'main' 分支时自动执行
+# 主要功能：
+#   1. 构建多架构 Docker 镜像 (支持 Intel/AMD 和 ARM 芯片)
+#   2. 推送镜像到 Docker Hub
+#   3. 自动 SSH 登录腾讯云服务器，拉取新镜像并重启服务 (零停机更新)
+# ==============================================================================
+
 name: CD - Build & Deploy
 
 on:
   push:
+    # 仅监听 main 分支的推送事件，防止开发分支误触发生产部署
     branches: [main]
 
 jobs:
+  # 定义一个名为 'deploy' 的任务
   deploy:
+    # 运行环境：使用 GitHub 提供的最新 Ubuntu 虚拟机
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
+      # ------------------------------------------------------------------------------
+      # 步骤 1: 检出代码
+      # 作用：将 GitHub 仓库的代码下载到 runner 当前目录，后续步骤才能访问 Dockerfile 等文件
+      # ------------------------------------------------------------------------------
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
+      # ------------------------------------------------------------------------------
+      # 步骤 2: 设置 Docker Buildx
+      # 作用：启用 Docker Buildx 工具，它支持高级功能如：
+      #   - 多架构构建 (同时构建 amd64 和 arm64 镜像)
+      #   - 构建缓存优化 (加速后续构建)
+      # ------------------------------------------------------------------------------
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # ------------------------------------------------------------------------------
+      # 步骤 3: 登录 Docker Hub
+      # 作用：认证身份，以便后续能推送镜像到私有或公有仓库
+      # 安全提示：用户名和密码存储在 GitHub Secrets 中，严禁硬编码在代码里
+      #   - secrets.DOCKER_USER: 你的 Docker Hub 用户名
+      #   - secrets.DOCKER_PASS: 你的 Docker Hub 访问令牌 (Access Token) 或密码
+      # ------------------------------------------------------------------------------
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PASS }}
 
+      # ------------------------------------------------------------------------------
+      # 步骤 4: 构建并推送镜像 (核心步骤)
+      # 作用：使用 Buildx 构建镜像并直接推送到远程仓库
+      # ------------------------------------------------------------------------------
       - name: Build and Push (Multi-arch)
         uses: docker/build-push-action@v5
         with:
+          # 构建上下文：当前目录 (.)，Docker 将基于此目录寻找文件
           context: .
+          
+          # 指定 Dockerfile 路径：位于 docker/ 目录下的 Dockerfile
           file: docker/Dockerfile
+          
+          # push: true 表示构建完成后自动推送到 registry，否则只构建在本地
           push: true
+          
+          # 镜像标签 (Tags) 策略：
+          #   1. :latest - 始终指向最新成功构建的版本 (方便拉取)
+          #   2. :<commit-hash> - 使用 Git commit SHA 作为标签，用于版本追溯和回滚
           tags: |
             ${{ secrets.DOCKER_USER }}/cloud-robot-viz:latest
             ${{ secrets.DOCKER_USER }}/cloud-robot-viz:${{ github.sha }}
-          platforms: linux/amd64,linux/arm64 # 支持不同架构
+          
+          # 多平台支持：
+          #   - linux/amd64: 适用于普通 PC 服务器 (如腾讯云 Intel/AMD 实例)
+          #   - linux/arm64: 适用于树莓派或 AWS Graviton 等 ARM 架构设备
+          # 注意：多架构构建需要 QEMU 模拟，速度会比单架构稍慢
+          platforms: linux/amd64,linux/arm64
+          
+          # 缓存优化策略 (加速构建)：
+          #   - cache-from: 尝试从远程仓库拉取之前的缓存层，避免重复编译未变化的代码
+          #   - cache-to: 将本次构建的新缓存层推送到远程仓库，供下次使用
           cache-from: type=registry,ref=${{ secrets.DOCKER_USER }}/cloud-robot-viz:buildcache
           cache-to: type=inline
 
+      # ------------------------------------------------------------------------------
+      # 步骤 5: 部署到腾讯云服务器
+      # 作用：通过 SSH 协议连接远程服务器，执行 Shell 脚本完成服务更新
+      # 使用的 Action: appleboy/ssh-action (GitHub 上最流行的 SSH 部署插件)
+      # ------------------------------------------------------------------------------
       - name: Deploy to Tencent Cloud
         uses: appleboy/ssh-action@master
         with:
+          # 服务器公网 IP (从 Secrets 获取)
           host: ${{ secrets.TENCENT_IP }}
+          
+          # 登录用户名 (腾讯云 Ubuntu 默认通常是 ubuntu)
           username: ubuntu
+          
+          # SSH 私钥 (从 Secrets 获取)
+          # 前提：你需要将 GitHub 公钥添加到云服务器的 ~/.ssh/authorized_keys，
+          # 或者将私钥本身存入 Secrets (此处是存私钥的方式)
           key: ${{ secrets.SSH_KEY }}
+          
+          # 要在服务器上执行的命令脚本
           script: |
-            echo "🔄 Pulling latest image..."
+            echo "🔄 正在拉取最新镜像..."
+            # 从 Docker Hub 拉取标记为 latest 的镜像
             docker pull ${{ secrets.DOCKER_USER }}/cloud-robot-viz:latest
             
-            echo "🛑 Stopping old container..."
+            echo "🛑 停止旧容器..."
+            # 停止名为 cloud-viz 的容器
+            # "|| true" 的作用是：如果容器不存在或停止失败，不要报错退出，继续执行后续命令
             docker stop cloud-viz || true
+            
+            echo "🗑️ 删除旧容器..."
+            # 删除已停止的容器，为新容器腾出名字和端口
             docker rm cloud-viz || true
             
-            echo "🚀 Starting new container..."
+            echo "🚀 启动新容器..."
+            # 运行新容器：
+            #   -d: 后台运行 (Detached mode)
+            #   --restart=always: 如果容器崩溃或服务器重启，自动重启容器 (保证高可用)
+            #   --name cloud-viz: 指定容器名称，方便后续管理
+            #   -p 80:80: 映射 Web 端口 (Nginx)
+            #   -p 9090:9090: 映射 ROS Bridge 端口 (WebSocket)
             docker run -d --restart=always --name cloud-viz \
               -p 80:80 -p 9090:9090 \
               ${{ secrets.DOCKER_USER }}/cloud-robot-viz:latest
             
-            echo "✅ Deployment Complete!"
+            echo "✅ 部署完成！"
+            
+            # 显示当前运行的容器列表，确认新容器状态为 Up
             docker ps
+            
+            # (可选) 清理悬空镜像 (dangling images)，节省磁盘空间
+            docker image prune -f
