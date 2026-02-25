@@ -37,14 +37,30 @@ jobs:
           colcon test-result --verbose
 
       - name: Run Integration Test
+        shell: bash
         run: |
           source /opt/ros/humble/setup.bash
           source install/setup.bash
           
           echo "🚀 Starting param_service node..."
+          # 确保使用正确的可执行名 (与 setup.py entry_points 一致)
+          # 如果 setup.py 写的是 'param_service = ...'，则这里用 param_service
           ros2 run cloud_monitor_pkg param_service &
+          
+          # 等待节点启动
           sleep 5
           
+          # 检查节点是否真的启动了
+          if ! ros2 node list | grep param_service_node; then
+            echo "❌ Error: Node param_service_node did not start!"
+            ros2 node list
+            exit 1
+          fi
+          
           echo "🧪 Running integration tests..."
-          pip3 install pytest
-          python3 ros_ws/src/cloud_monitor_pkg/tests/integration_test.py
+          pip3 install pytest --quiet
+          
+          # 🔴 关键修复：指向正确的项目根目录下的 tests 文件夹
+          # 当前工作目录是 GitHub Workspace 根目录 (MyCloudRobot/)
+          # 所以路径应该是 tests/integration_test.py
+          python3 tests/integration_test.py

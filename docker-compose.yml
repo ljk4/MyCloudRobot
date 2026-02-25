@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  ros-master:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: ros-master
+    ports:
+      - "80:80"     # Map container port 80 to host port 80 (Web UI)
+      - "9090:9090" # Map container port 9090 to host port 9090 (Rosbridge)
+    volumes:
+      - ./ros_ws/src:/root/ws/src # Mount source code for live editing (optional but useful)
+      - ./web:/usr/share/nginx/html # Mount web files for live editing
+    environment:
+      - ROS_DOMAIN_ID=0
+    restart: unless-stopped
