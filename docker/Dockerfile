@@ -7,7 +7,7 @@ RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.tuna.tsinghua.edu.cn@g' /etc/apt/
 
 ENV ROSDISTRO_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/rosdistro/index-v4.yaml
 
-WORKDIR /root/ws
+WORKDIR /ws
 COPY ros_ws/src ./src
 
 # 🔴 关键修复：在安装 rosdep 之前或之后安装 pip3
@@ -43,8 +43,8 @@ RUN apt-get update && apt-get install -y \
 RUN useradd -m -u 1000 robotuser
 
 # 复制构建产物
-COPY --from=builder /root/ws/install /root/ws/install
-COPY --from=builder /root/ws/src /root/ws/src
+COPY --from=builder /ws/install /home/robotuser/ws/install
+COPY --from=builder /ws/src /home/robotuser/ws/src
 
 # 复制 Web 文件
 COPY web/index.html /usr/share/nginx/html/index.html
@@ -54,7 +54,7 @@ COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY tests /tests
 
 # 权限设置
-RUN chown -R robotuser:robotuser /root/ws /var/log/nginx /var/lib/nginx /usr/share/nginx/html
+RUN chown -R robotuser:robotuser /home/robotuser/ws /var/log/nginx /var/lib/nginx /usr/share/nginx/html
 
 COPY --chown=robotuser:robotuser docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

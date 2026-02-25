@@ -3,7 +3,7 @@ set -e
 
 # 加载 ROS 2 环境
 source /opt/ros/humble/setup.bash
-source /root/ws/install/setup.bash
+source /home/robotuser/ws/install/setup.bash
 
 echo "🚀 Starting Cloud Robot System..."
 
