@@ -1,6 +1,8 @@
 # Stage 1: Builder (使用预构建的基础镜像，包含编译工具和依赖)
-# 假设基础镜像 tag 为 ljk4/cloud-robot-viz-base:latest
-FROM ljk4/cloud-robot-viz-base:latest AS builder
+# ARG DOCKER_USER
+ARG DOCKER_USER=liujiankang123
+FROM ${DOCKER_USER}/cloud-robot-viz-base:latest AS builder
+
 
 SHELL ["/bin/bash", "-c"]
 
@@ -20,7 +22,8 @@ RUN source /opt/ros/humble/setup.bash && \
 
 # Stage 2: Runtime
 # 直接使用包含运行时环境（nginx, rosbridge等）的基础镜像
-FROM ljk4/cloud-robot-viz-base:latest
+ARG DOCKER_USER=liujiankang123
+FROM ${DOCKER_USER}/cloud-robot-viz-base:latest
 
 ENV DEBIAN_FRONTEND=noninteractive
 

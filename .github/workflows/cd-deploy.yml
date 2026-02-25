@@ -62,6 +62,8 @@ jobs:
           
           # 指定 Dockerfile 路径：位于 docker/ 目录下的 Dockerfile
           file: docker/Dockerfile
+          build-args: |
+            DOCKER_USER=${{ secrets.DOCKER_USER }}
           
           # push: true 表示构建完成后自动推送到 registry，否则只构建在本地
           push: true
