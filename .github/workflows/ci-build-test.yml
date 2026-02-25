@@ -1,0 +1,49 @@
+name: CI - Build & Test
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04 # 使用 22.04 运行 Humble 原生测试
+    container: ros:humble
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          apt-get update
+          rosdep update
+          rosdep install --from-paths ros_ws/src --ignore-src -r -y
+          pip3 install pytest
+
+      - name: Build
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon build --symlink-install
+
+      - name: Lint (Code Quality)
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon test --packages-select cloud_monitor_pkg
+          colcon test-result --verbose
+
+      - name: Run Integration Test (Core Logic)
+        run: |
+          source /opt/ros/humble/setup.bash
+          source install/setup.bash
+          
+          # 后台启动节点
+          ros2 run cloud_monitor_pkg param_service &
+          sleep 5
+          
+          # 自动调用 Service 验证逻辑 (关键！)
+          echo "Testing Service Call..."
+          RESULT=$(ros2 service call /set_safety_mode std_srvs/srv/SetBool "{data: true}")
+          
+          if [[ "$RESULT" == *"success: true"* ]]; then
+            echo "✅ Integration Test Passed!"
+          else
+            echo "❌ Test Failed"
+            exit 1
+          fi
