@@ -11,6 +11,8 @@ WORKDIR /root/ws
 COPY ros_ws/src ./src
 
 # 🔴 关键修复：在安装 rosdep 之前或之后安装 pip3
+# 使用 bash shell 来执行 RUN 指令，以支持 source 命令
+SHELL ["/bin/bash", "-c"]
 RUN apt-get update && \
     apt-get install -y python3-pip \
     ros-humble-std-srvs \
@@ -18,7 +20,7 @@ RUN apt-get update && \
     ros-humble-nav-msgs \
     ros-humble-geometry-msgs \
     && \
-    . /opt/ros/humble/setup.bash && \
+    source /opt/ros/humble/setup.bash && \
     colcon build --symlink-install
 
 # Stage 2: Runtime (最小化运行环境)
