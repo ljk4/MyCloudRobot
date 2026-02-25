@@ -1,0 +1,4 @@
+FROM ubuntu:22.04
+RUN useradd -m -u 1000 robotuser
+USER robotuser
+CMD nc -l -p 80

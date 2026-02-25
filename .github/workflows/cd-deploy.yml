@@ -124,10 +124,10 @@ jobs:
             #   -d: 后台运行 (Detached mode)
             #   --restart=always: 如果容器崩溃或服务器重启，自动重启容器 (保证高可用)
             #   --name cloud-viz: 指定容器名称，方便后续管理
-            #   -p 80:80: 映射 Web 端口 (Nginx)
+            #   -p 80:8080: 映射 Web 端口 (Nginx listen on 8080)
             #   -p 9090:9090: 映射 ROS Bridge 端口 (WebSocket)
             docker run -d --restart=always --name cloud-viz \
-              -p 80:80 -p 9090:9090 \
+              -p 80:8080 -p 9090:9090 \
               ${{ secrets.DOCKER_USER }}/cloud-robot-viz:latest
             
             echo "✅ 部署完成！"

@@ -22,7 +22,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'simulator = cloud_monitor_pkg.simulator_node:main',
+            'path_planner = cloud_monitor_pkg.path_planner_node:main',
             # 左边 'param_service' 是你在终端输入的命令
             # 右边 'param_service_node' 是文件名 (不带 .py)
             # ':main' 是函数名
