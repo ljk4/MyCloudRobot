@@ -11,7 +11,7 @@ services:
       - "9090:9090" # Map container port 9090 to host port 9090 (Rosbridge)
     volumes:
       - ./ros_ws/src:/home/robotuser/ws/src # Mount source code for live editing (optional but useful)
-      - ./web:/usr/share/nginx/html # Mount web files for live editing
+      - ./web:/home/robotuser/web # Mount web files for live editing
     environment:
       - ROS_DOMAIN_ID=0
     restart: unless-stopped

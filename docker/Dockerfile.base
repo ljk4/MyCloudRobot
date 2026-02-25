@@ -1,0 +1,38 @@
+
+# ☁️ Cloud Robot Viz - Base Image
+# 这个文件用于构建基础环境镜像，包含所有耗时的依赖安装
+# 构建命令: docker build -t ljk4/cloud-robot-viz-base:latest -f docker/Dockerfile.base .
+# 推送命令: docker push ljk4/cloud-robot-viz-base:latest
+
+FROM ros:humble
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 1. 配置国内源 (加速 apt/rosdep) 并修复 GPG 密钥
+RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.tuna.tsinghua.edu.cn@g' /etc/apt/sources.list \
+    && sed -i 's@//security.ubuntu.com@//mirrors.tuna.tsinghua.edu.cn@g' /etc/apt/sources.list \
+    && apt-get update && apt-get install -y curl gnupg2 \
+    && curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] https://mirrors.tuna.tsinghua.edu.cn/ros2/ubuntu jammy main" > /etc/apt/sources.list.d/ros2-latest.list
+
+ENV ROSDISTRO_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/rosdistro/index-v4.yaml
+
+# 2. 安装所有构建和运行时所需的系统依赖
+# 包括：编译工具(python3-pip), 运行时组件(nginx, rosbridge), 常用工具(curl, net-tools)
+# 将所有 apt-get 操作合并为一个 RUN 指令以减少层数
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    nginx \
+    curl \
+    net-tools \
+    iputils-ping \
+    ros-humble-rosbridge-server \
+    ros-humble-tf2-web-republisher \
+    ros-humble-std-srvs \
+    ros-humble-sensor-msgs \
+    ros-humble-nav-msgs \
+    ros-humble-geometry-msgs \
+    && rm -rf /var/lib/apt/lists/*
+
+# 3. 预先创建用户 (可选，也可以在应用镜像做)
+RUN useradd -m -u 1000 robotuser
