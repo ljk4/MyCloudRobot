@@ -61,10 +61,10 @@ RUN chmod +x /entrypoint.sh
 
 USER robotuser
 
-EXPOSE 80 9090
+EXPOSE 8080 9090
 
 # 健康检查：检查 Web 和 Rosbridge 端口
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-    CMD curl -f http://localhost:80 && netstat -tlnp | grep 9090 || exit 1
+    CMD curl -f http://localhost:8080 && netstat -tlnp | grep 9090 || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]

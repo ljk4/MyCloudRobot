@@ -273,7 +273,7 @@ docker inspect --format='{{.State.Health.Status}}' cloud-robot-viz
 
 ---
 
-## � 常见问题排查 (Troubleshooting)
+## 🔧 常见问题排查 (Troubleshooting)
 
 如果在开发或部署过程中遇到问题，请首先查看详细的 [CI/CD 故障排查指南](CI_TROUBLESHOOTING.md)。
 
@@ -290,7 +290,7 @@ docker inspect --format='{{.State.Health.Status}}' cloud-robot-viz
 
 ---
 
-## �📝 常见问题 (FAQ)
+## 📝 常见问题 (FAQ)
 
 **Q: 为什么选择 Web 可视化而不是 Rviz?**
 A: 云服务器通常无显卡且带宽有限。Rviz 需要传输大量图像帧或通过 X11 转发，延迟高且卡顿。Web 方案仅传输结构化数据 (JSON)，由浏览器本地渲染，流畅度更高。
