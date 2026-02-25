@@ -9,7 +9,6 @@ setup(
     version='1.0.0',
     packages=[package_name],
     data_files=[
-        # 现在这个相对路径能正确指向 root/resource/cloud_monitor_pkg
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', glob(os.path.join('launch', '*.launch.py'))),

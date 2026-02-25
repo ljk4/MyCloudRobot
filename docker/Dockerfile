@@ -1,14 +1,24 @@
 # Stage 1: Builder
 FROM ros:humble AS builder
 
+# Change to Tsinghua Mirror for apt to speed up build
+RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.tuna.tsinghua.edu.cn@g' /etc/apt/sources.list \
+    && sed -i 's@//security.ubuntu.com@//mirrors.tuna.tsinghua.edu.cn@g' /etc/apt/sources.list \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] https://mirrors.tuna.tsinghua.edu.cn/ros2/ubuntu jammy main" > /etc/apt/sources.list.d/ros2-latest.list
+
+ENV ROSDISTRO_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/rosdistro/index-v4.yaml
+
 WORKDIR /root/ws
 COPY ros_ws/src ./src
 
 # 🔴 关键修复：在安装 rosdep 之前或之后安装 pip3
 RUN apt-get update && \
-    apt-get install -y python3-pip && \
-    rosdep update && \
-    rosdep install --from-paths src --ignore-src -r -y && \
+    apt-get install -y python3-pip \
+    ros-humble-std-srvs \
+    ros-humble-sensor-msgs \
+    ros-humble-nav-msgs \
+    ros-humble-geometry-msgs \
+    && \
     . /opt/ros/humble/setup.bash && \
     colcon build --symlink-install
 
