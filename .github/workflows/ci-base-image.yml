@@ -1,0 +1,52 @@
+# ==============================================================================
+# Workflow: Build Base Image
+# Purpose: Builds the base image containing dependencies (ROS 2, System libs)
+#          This image rarely changes, so it's separated from the main CD pipeline.
+# Trigger: 
+#   1. Manual run (workflow_dispatch) - ESSENTIAL for the first time.
+#   2. Changes to docker/Dockerfile.base
+# ==============================================================================
+
+name: CI - Build Base Image
+
+on:
+  workflow_dispatch:  # Allow manual trigger
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'docker/Dockerfile.base'  # Only trigger if the base Dockerfile changes
+
+jobs:
+  build-base:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Setup QEMU for multi-arch builds (if you need ARM support)
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PASS }}
+
+      - name: Build and Push Base Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.base
+          push: true  # Push to Docker Hub
+          platforms: linux/amd64,linux/arm64 # Support both PC and Raspberry Pi/Armor server
+          tags: ${{ secrets.DOCKER_USER }}/cloud-robot-viz-base:latest
+          # Cache config to speed up future runs
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USER }}/cloud-robot-viz-base:buildcache
+          cache-to: type=inline
