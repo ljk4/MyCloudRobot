@@ -1,6 +1,16 @@
 name: CI - Build & Test
 
-on: [push, pull_request]
+on: 
+  push:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
 
 # 全局默认使用 bash，避免 source 命令报错
 defaults:
@@ -10,15 +20,20 @@ defaults:
 jobs:
   test:
     runs-on: ubuntu-22.04 
-    container: ros:humble
+    # 使用在此之前构建好的基础镜像，以跳过漫长的 apt-get install 过程
+    # 注意：如果基础镜像更新了，需要手动触发 ci-base-image.yml 构建一次
+    # 这里我们假设使用 owner 的 Docker Hub 用户名，或者硬编码为您的用户名
+    # 由于 container 字段不支持 secrets 上下文，这里我们直接使用公共镜像
+    container: liujiankang123/cloud-robot-viz-base:latest
     
     steps:
       - uses: actions/checkout@v4
 
       - name: Install System Dependencies
         run: |
+          # 基础镜像已包含大部分依赖，这里只做最小化检查
+          # 如果有新增依赖，rosdep 会自动安装
           apt-get update
-          apt-get install -y python3-pip
           rosdep update
           rosdep install --from-paths ros_ws/src --ignore-src -r -y || true
 
