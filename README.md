@@ -2,6 +2,10 @@
 
 本项目已从最初的云端监控面板演变成一个全栈交互式的 **ROS 2 路径规划游戏**。它展示了如何结合 **ROS 2 Humble**、**Docker**、**WebSockets** 和 **HTML5 Canvas** 进行机器人全栈开发。
 
+## 📺 演示 (Demo)
+
+[🎥 点击观看演示视频](docs/demo.mp4)
+
 ## ✨ 主要特性
 
 ### 🏆 挑战模式 (Challenge Mode) - 新增!
