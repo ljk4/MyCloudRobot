@@ -2,18 +2,44 @@
 # -*- coding: utf-8 -*-
 """
 ROS 2 集成测试脚本
-用于验证 param_service_node 的逻辑是否正确响应服务调用。
-可以在 CI 管道中运行，也可以本地运行。
+用于验证 PathPlannerNode 的寻路逻辑是否正确响应。
 """
 import pytest
 import rclpy
-from std_srvs.srv import SetBool, Trigger
 from rclpy.node import Node
+from std_msgs.msg import String
+import json
 import time
+import threading
 
-class TestClient(Node):
+class PathPlannerTester(Node):
     def __init__(self):
         super().__init__('integration_test_client')
+        self.publisher_ = self.create_publisher(String, 'game_request', 10)
+        self.subscription = self.create_subscription(
+            String,
+            'game_response',
+            self.listener_callback,
+            10)
+        self.received_response = None
+        self.get_logger().info("🧪 Test Client Ready")
+
+    def listener_callback(self, msg):
+        self.get_logger().info(f"📩 Received response: {msg.data}")
+        self.received_response = json.loads(msg.data)
+
+    def send_request(self, start, goal, obstacles):
+        request_data = {
+            "start": start,
+            "goal": goal,
+            "obstacles": obstacles,
+            "width": 10,
+            "height": 10
+        }
+        msg = String()
+        msg.data = json.dumps(request_data)
+        self.publisher_.publish(msg)
+        self.get_logger().info(f"📤 Sent request: {msg.data}")
 
 @pytest.fixture(scope="module")
 def ros_context():
@@ -22,60 +48,68 @@ def ros_context():
     yield
     rclpy.shutdown()
 
-def test_safety_mode_service(ros_context):
-    """测试 1: 切换安全模式"""
-    node = TestClient()
-    client = node.create_client(SetBool, 'set_safety_mode')
-    
-    # 等待服务可用 (最多等 5 秒)
-    if not client.wait_for_service(timeout_sec=5.0):
-        raise RuntimeError("服务 /set_safety_mode 未找到！节点可能未启动。")
+def run_node_in_thread(node):
+    rclpy.spin(node)
 
-    # 请求开启安全模式 (True)
-    req = SetBool.Request()
-    req.data = True
-    future = client.call_async(req)
+def test_simple_path(ros_context):
+    """测试 1: 简单的无障碍路径规划"""
+    tester = PathPlannerTester()
     
-    # 简单的事件循环等待结果 (在测试脚本中简化处理)
-    while rclpy.ok() and not future.done():
-        rclpy.spin_once(node, timeout_sec=0.1)
+    # 在单独线程中运行 spin，以便接收回调
+    spin_thread = threading.Thread(target=run_node_in_thread, args=(tester,), daemon=True)
+    spin_thread.start()
     
-    if future.exception():
-        raise Exception(f"服务调用失败: {future.exception()}")
+    # 发送请求: 从 (0,0) 到 (2,2)，无障碍
+    # 期望路径可能是: (0,0)->(1,0)->(2,0)->(2,1)->(2,2) 或其他等长路径
+    tester.send_request(start=[0,0], goal=[2,2], obstacles=[])
     
-    response = future.result()
-    assert response.success is True, "服务返回成功标志应为 True"
-    assert "SAFE" in response.message, "返回消息应包含 SAFE 字样"
-    
-    node.get_logger().info(f"✅ 测试通过: {response.message}")
-    
-    # 清理
-    node.destroy_node()
-
-def test_reset_service(ros_context):
-    """测试 2: 重置机器人参数"""
-    node = TestClient()
-    client = node.create_client(Trigger, 'reset_robot')
-    
-    if not client.wait_for_service(timeout_sec=5.0):
-        raise RuntimeError("服务 /reset_robot 未找到！")
-
-    req = Trigger.Request()
-    future = client.call_async(req)
-    
-    while rclpy.ok() and not future.done():
-        rclpy.spin_once(node, timeout_sec=0.1)
+    # 等待响应 (最多 5 秒)
+    timeout = 5.0
+    start_time = time.time()
+    while tester.received_response is None:
+        if time.time() - start_time > timeout:
+            pytest.fail("Timeout waiting for path response")
+        time.sleep(0.1)
         
-    if future.exception():
-        raise Exception(f"服务调用失败: {future.exception()}")
+    response = tester.received_response
+    assert response['status'] == 'success', "Should find a path"
+    path = response['path']
+    assert len(path) > 0, "Path should not be empty"
+    assert tuple(path[0]) == (0,0), "Start point mismatch"
+    assert tuple(path[-1]) == (2,2), "Goal point mismatch"
     
-    response = future.result()
-    assert response.success is True, "重置服务应成功"
-    assert "Reset" in response.message, "返回消息应包含 Reset 字样"
+    tester.get_logger().info(f"✅ Simple Path Test Passed: {path}")
+
+def test_obstacle_avoidance(ros_context):
+    """测试 2: 障碍物绕行"""
+    tester = PathPlannerTester()
     
-    node.get_logger().info(f"✅ 测试通过: {response.message}")
-    node.destroy_node()
+    spin_thread = threading.Thread(target=run_node_in_thread, args=(tester,), daemon=True)
+    spin_thread.start()
+    
+    # 发送请求: 从 (0,0) 到 (0,2)，中间 (0,1) 有障碍物
+    # 期望绕行: (0,0) -> (1,0) -> (1,1) -> (1,2) -> (0,2) (示例)
+    tester.send_request(start=[0,0], goal=[0,2], obstacles=[[0,1]])
+    
+    timeout = 5.0
+    start_time = time.time()
+    while tester.received_response is None:
+        if time.time() - start_time > timeout:
+            pytest.fail("Timeout waiting for path response")
+        time.sleep(0.1)
+        
+    response = tester.received_response
+    assert response['status'] == 'success', "Should find a path around obstacle"
+    path = response['path']
+    
+    # 验证没有穿过障碍物 (0,1)
+    for point in path:
+        assert tuple(point) != (0,1), "Path hit the obstacle!"
+        
+    tester.get_logger().info(f"✅ Obstacle Test Passed: {path}")
 
 if __name__ == '__main__':
-    # 允许直接运行 python integration_test.py
+    # 提示: 运行此测试前需要先启动 path_planner_node
+    # ros2 run cloud_monitor_pkg path_planner_node
+    print("⚠️  Ensure 'path_planner_node' is running before executing tests!")
     pytest.main([__file__, "-v"])
