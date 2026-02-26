@@ -48,29 +48,31 @@ def ros_context():
     yield
     rclpy.shutdown()
 
-def run_node_in_thread(node):
-    rclpy.spin(node)
+def spin_while_waiting(node, timeout=5.0):
+    """在等待响应的同时手动 spin 节点"""
+    start_time = time.time()
+    while node.received_response is None:
+        if time.time() - start_time > timeout:
+            return False
+        # 手动执行一次回调处理，timeout_sec=0.1 表示非阻塞等待 0.1s
+        rclpy.spin_once(node, timeout_sec=0.1)
+    return True
 
 def test_simple_path(ros_context):
     """测试 1: 简单的无障碍路径规划"""
+    # 使用唯一名称防止冲突 (虽然我们会在最后 destroy_node)
     tester = PathPlannerTester()
     
-    # 在单独线程中运行 spin，以便接收回调
-    spin_thread = threading.Thread(target=run_node_in_thread, args=(tester,), daemon=True)
-    spin_thread.start()
-    
-    # 发送请求: 从 (0,0) 到 (2,2)，无障碍
-    # 期望路径可能是: (0,0)->(1,0)->(2,0)->(2,1)->(2,2) 或其他等长路径
+    # 发送请求
     tester.send_request(start=[0,0], goal=[2,2], obstacles=[])
     
-    # 等待响应 (最多 5 秒)
-    timeout = 5.0
-    start_time = time.time()
-    while tester.received_response is None:
-        if time.time() - start_time > timeout:
-            pytest.fail("Timeout waiting for path response")
-        time.sleep(0.1)
-        
+    # 使用单线程 spin 等待结果
+    success = spin_while_waiting(tester, timeout=5.0)
+    
+    if not success:
+        tester.destroy_node()
+        pytest.fail("Timeout waiting for path response")
+
     response = tester.received_response
     assert response['status'] == 'success', "Should find a path"
     path = response['path']
@@ -79,24 +81,20 @@ def test_simple_path(ros_context):
     assert tuple(path[-1]) == (2,2), "Goal point mismatch"
     
     tester.get_logger().info(f"✅ Simple Path Test Passed: {path}")
+    tester.destroy_node()
 
 def test_obstacle_avoidance(ros_context):
     """测试 2: 障碍物绕行"""
     tester = PathPlannerTester()
     
-    spin_thread = threading.Thread(target=run_node_in_thread, args=(tester,), daemon=True)
-    spin_thread.start()
-    
-    # 发送请求: 从 (0,0) 到 (0,2)，中间 (0,1) 有障碍物
-    # 期望绕行: (0,0) -> (1,0) -> (1,1) -> (1,2) -> (0,2) (示例)
+    # 发送请求
     tester.send_request(start=[0,0], goal=[0,2], obstacles=[[0,1]])
     
-    timeout = 5.0
-    start_time = time.time()
-    while tester.received_response is None:
-        if time.time() - start_time > timeout:
-            pytest.fail("Timeout waiting for path response")
-        time.sleep(0.1)
+    success = spin_while_waiting(tester, timeout=5.0)
+    
+    if not success:
+        tester.destroy_node()
+        pytest.fail("Timeout waiting for path response")
         
     response = tester.received_response
     assert response['status'] == 'success', "Should find a path around obstacle"
@@ -107,6 +105,7 @@ def test_obstacle_avoidance(ros_context):
         assert tuple(point) != (0,1), "Path hit the obstacle!"
         
     tester.get_logger().info(f"✅ Obstacle Test Passed: {path}")
+    tester.destroy_node()
 
 if __name__ == '__main__':
     # 提示: 运行此测试前需要先启动 path_planner_node
