@@ -113,23 +113,25 @@ jobs:
             docker pull ${{ secrets.DOCKER_USER }}/cloud-robot-viz:latest
             
             echo "🛑 停止旧容器..."
-            # 停止名为 cloud-viz 的容器
+            # 停止名为 ros-master 的容器
             # "|| true" 的作用是：如果容器不存在或停止失败，不要报错退出，继续执行后续命令
-            docker stop cloud-viz || true
+            docker stop ros-master || true
             
             echo "🗑️ 删除旧容器..."
             # 删除已停止的容器，为新容器腾出名字和端口
-            docker rm cloud-viz || true
+            docker rm ros-master || true
             
             echo "🚀 启动新容器..."
             # 运行新容器：
             #   -d: 后台运行 (Detached mode)
             #   --restart=always: 如果容器崩溃或服务器重启，自动重启容器 (保证高可用)
-            #   --name cloud-viz: 指定容器名称，方便后续管理
+            #   --name ros-master: 指定容器名称 (与 docker-compose 保持一致)
             #   -p 80:8080: 映射 Web 端口 (Nginx listen on 8080)
             #   -p 9090:9090: 映射 ROS Bridge 端口 (WebSocket)
-            docker run -d --restart=always --name cloud-viz \
+            #   -e ROS_DOMAIN_ID=0: 设置 ROS 域 ID
+            docker run -d --restart=always --name ros-master \
               -p 80:8080 -p 9090:9090 \
+              -e ROS_DOMAIN_ID=0 \
               ${{ secrets.DOCKER_USER }}/cloud-robot-viz:latest
             
             echo "✅ 部署完成！"

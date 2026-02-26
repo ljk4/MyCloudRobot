@@ -4,7 +4,8 @@
 
 ## 📺 演示 (Demo)
 
-[🎥 点击观看演示视频](docs/demo.mp4)
+![Gameplay Demo](docs/demo.gif)
+
 
 ## ✨ 主要特性
 
@@ -50,7 +51,7 @@
     *(首次运行需要下载基础镜像，请耐心等待)*
 
 3.  **访问游戏**:
-    打开浏览器访问 `http://localhost:8080`。
+    打开浏览器访问 `http://localhost` (或 `http://localhost:80`)。
 
 ---
 
@@ -101,18 +102,22 @@
 **步骤**:
 1.  **购买服务器**: 推荐 Ubuntu 20.04/22.04 镜像。
 2.  **配置安全组 (防火墙)**:
-    *   开放 TCP 端口 **8080** (Web访问)。
+    *   开放 TCP 端口 **80** (Web访问)。
     *   开放 TCP 端口 **9090** (WebSocket通信)。
-3.  **安装 Docker**:
+    *   *注：本项目容器内部使用 8080 端口，但已映射到服务器的 80 端口，因此无需在防火墙开放 8080。*
+3.  **安装环境**:
+    使用项目自带的脚本一键安装 Docker 和常用工具 (使用国内镜像源)：
     ```bash
-    curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
+    # 赋予执行权限
+    chmod +x install-docker.sh
+    # 运行安装脚本
+    ./install-docker.sh
     ```
 4.  **部署项目**:
-    上传代码到服务器，然后运行：
     ```bash
     docker compose up -d
     ```
-5.  **访问**: `http://<你的服务器公网IP>:8080`
+5.  **访问**: 打开浏览器访问 `http://<你的服务器公网IP>` (默认端口 80，无需输入)。
 
 ---
 
@@ -182,6 +187,7 @@
 ├── docker/                 # Docker 配置
 │   ├── Dockerfile          # 多阶段 ROS 2 构建文件
 │   └── entrypoint.sh       # 容器启动脚本
+│   └── nginx.conf          # Nginx 配置文件
 ├── ros_ws/
 │   └── src/
 │       └── cloud_monitor_pkg/
@@ -189,6 +195,9 @@
 │           │   └── path_planner_node.py  # 核心寻路逻辑 (A*)
 │           └── launch/
 │               └── system.launch.py      # ROS 2 启动文件
-└── web/
-    └── index.html          # 游戏主界面 (HTML5 Canvas)
+├── tests/                  # 测试代码
+│   └── integration_test.py # 集成测试脚本
+├── web/
+│   └── index.html          # 游戏主界面 (HTML5 Canvas)
+└── install-docker.sh       # 环境安装脚本
 ```
