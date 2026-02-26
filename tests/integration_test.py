@@ -62,6 +62,7 @@ def test_simple_path(ros_context):
     """测试 1: 简单的无障碍路径规划"""
     # 使用唯一名称防止冲突 (虽然我们会在最后 destroy_node)
     tester = PathPlannerTester()
+    time.sleep(1) # 等待节点和通讯建立
     
     # 发送请求
     tester.send_request(start=[0,0], goal=[2,2], obstacles=[])
@@ -86,6 +87,7 @@ def test_simple_path(ros_context):
 def test_obstacle_avoidance(ros_context):
     """测试 2: 障碍物绕行"""
     tester = PathPlannerTester()
+    time.sleep(1) # 等待节点和通讯建立
     
     # 发送请求
     tester.send_request(start=[0,0], goal=[0,2], obstacles=[[0,1]])
@@ -108,7 +110,8 @@ def test_obstacle_avoidance(ros_context):
     tester.destroy_node()
 
 if __name__ == '__main__':
+    import sys
     # 提示: 运行此测试前需要先启动 path_planner_node
     # ros2 run cloud_monitor_pkg path_planner_node
     print("⚠️  Ensure 'path_planner_node' is running before executing tests!")
-    pytest.main([__file__, "-v"])
+    sys.exit(pytest.main([__file__, "-v"]))
